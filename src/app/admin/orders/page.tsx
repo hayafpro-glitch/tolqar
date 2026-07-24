@@ -38,7 +38,7 @@ export default async function AdminOrdersPage() {
               <tr key={o.id} className="border-b border-line last:border-0">
                 <td className="p-4 font-mono text-xs" dir="ltr">{o.orderNumber}</td>
                 <td className="p-4">{o.user?.name ?? o.user?.email}</td>
-                <td className="p-4">{formatPrice(o.totalAmount)}</td>
+                <td className="p-4">{formatPrice(Number(o.totalAmount))}</td>
                 <td className="p-4">{o.paymentMethod}</td>
                 <td className="p-4">
                   <OrderStatusSelect id={o.id} status={o.status} />
