@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.eyebrow {
+  @apply inline-flex items-center gap-2.5 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-orange;
+}
+.eyebrow::before {
+  content: "";
+  @apply inline-block h-px w-[18px] bg-orange;
+}
+
+.container-tolqar {
+  @apply mx-auto max-w-[1160px] px-6;
+}

@@ -1,0 +1,270 @@
+// TOLQAR Platform — Database Schema
+// يمثل هذا الملف بنية قاعدة البيانات الكاملة للمنصة
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== المستخدمون والصلاحيات ====================
+
+enum Role {
+  ADMIN
+  EDITOR
+  CUSTOMER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String? // مشفّرة بواسطة bcrypt
+  role          Role      @default(CUSTOMER)
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]
+  reviews       Review[]
+  subscriptions Subscription[]
+  articles      Article[] // المقالات التي كتبها (Editor/Admin)
+
+  @@map("users")
+}
+
+// جداول NextAuth القياسية
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ==================== المتجر الرقمي ====================
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  description   String   @db.Text
+  price         Decimal  @db.Decimal(10, 2)
+  discountPrice Decimal? @db.Decimal(10, 2)
+  coverImage    String?
+  images        String[] // روابط صور إضافية
+  fileUrl       String? // رابط الملف الرقمي القابل للتحميل بعد الدفع
+  salesCount    Int      @default(0)
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  reviews    Review[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int // 1-5
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+// ==================== الكوبونات ====================
+
+model Coupon {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  discountType   String // "PERCENT" | "FIXED"
+  discountValue  Decimal   @db.Decimal(10, 2)
+  maxUses        Int?
+  usedCount      Int       @default(0)
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  orders         Order[]
+
+  @@map("coupons")
+}
+
+// ==================== الطلبات والدفع ====================
+
+enum OrderStatus {
+  PENDING
+  PAID
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique @default(cuid())
+  status        OrderStatus @default(PENDING)
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  paymentMethod String // "STRIPE" | "PAYPAL" | "USDT_TRC20" | "USDT_BEP20" | "BINANCE_PAY" | "MANUAL_LOCAL"
+  paymentProof  String? // رابط صورة إثبات الدفع (للدفع اليدوي)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  couponId String?
+  coupon   Coupon? @relation(fields: [couponId], references: [id])
+
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  quantity Int     @default(1)
+  price    Decimal @db.Decimal(10, 2) // السعر وقت الشراء
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// طرق الدفع المحلية القابلة للإدارة من لوحة التحكم
+model LocalPaymentMethod {
+  id            String   @id @default(cuid())
+  countryCode   String // "YE" | "SA" | "GCC" | ...
+  name          String // مثال: "حوالة كريمي" أو "الكريمي موبايل"
+  instructions  String   @db.Text
+  accountInfo   String   @db.Text // رقم الحساب/المحفظة
+  isActive      Boolean  @default(true)
+
+  @@map("local_payment_methods")
+}
+
+// ==================== الاشتراكات ====================
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  plan      String // "MONTHLY" | "YEARLY" | "VIP"
+  status    SubscriptionStatus @default(ACTIVE)
+  startDate DateTime           @default(now())
+  endDate   DateTime
+  createdAt DateTime           @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+}
+
+// ==================== المحتوى (المدونة + الصفحات) ====================
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String   @db.Text
+  coverImage  String?
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@map("articles")
+}
+
+// صفحات المحتوى القابلة للتعديل من لوحة التحكم (من نحن، سياسة الخصوصية...)
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique // "about" | "privacy" | "faq" ...
+  title     String
+  content   String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("pages")
+}
+
+// معرض الأعمال
+model PortfolioItem {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String   @db.Text
+  coverImage  String?
+  projectUrl  String?
+  tags        String[]
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("portfolio_items")
+}
+
+// إعدادات الموقع العامة (اسم الموقع، الشعار، السوشيال ميديا...)
+model SiteSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @db.Text
+
+  @@map("site_settings")
+}
