@@ -51,7 +51,7 @@ export default async function AdminProductsPage() {
                   )}
                 </td>
                 <td className="p-4">{p.title}</td>
-                <td className="p-4">{formatPrice(p.price)}</td>
+                <td className="p-4">{formatPrice(Number(p.price))}</td>
                 <td className="p-4">{p.salesCount}</td>
                 <td className="p-4">
                   {p.isPublished ? (
