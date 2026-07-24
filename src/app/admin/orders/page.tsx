@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { formatPrice } from "@/lib/utils";
 import OrderStatusSelect from "./OrderStatusSelect";
 
 export const dynamic = "force-dynamic";
 
+type OrderWithRelations = Prisma.OrderGetPayload<{ include: { user: true; items: { include: { product: true } } } }>;
+
 export default async function AdminOrdersPage() {
-  let orders: Awaited<ReturnType<typeof prisma.order.findMany>> = [];
+  let orders: OrderWithRelations[] = [];
   try {
     orders = await prisma.order.findMany({
       orderBy: { createdAt: "desc" },
